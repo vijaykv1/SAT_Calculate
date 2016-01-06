@@ -1,16 +1,15 @@
-/*
- * Equivalence Checker for netlists
- *
- *
- * Name 1: Varun Vijaykumar 
- * Matriculation Number 1: 391960
- * Date of Completion : /05/2015
- *
- */
 
-#ifndef _SAT_H_DECLARE_
-#define _SAT_H_DECLARE_
+/*********************************************************************
+ ** File : sat.h
+ ** Description: SAT Equivalence Checker using Davis Putnam Algorithm.
+ ** Author: Varun Vijaykumar <varun.vijaykumar@s2014.tu-chemnitz.de>
+ ** Date : 23rd June 2015
+ *********************************************************************/
 
+#ifndef __SAT_H_DECLARE__
+#define __SAT_H_DECLARE__
+
+//includes
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
@@ -20,6 +19,14 @@
 #include <string>
 #include <cstdlib>
 
+// defines
+#define fileReadERROR -1
+#define argReadERROR -1
+#define fileReadSuccess 0
+#define SUCCESS 0
+#define FAILURE -1
+
+//namespaces
 using namespace std;
 
 typedef enum
@@ -30,7 +37,7 @@ typedef enum
 	XOR,
 	ZERO,
 	ONE,
-	EQUAL, // adding this here for the sake of adding inputs Mapping in the case of MITER 
+	EQUAL,
 	UNDEFINED
 } GateType;
 
@@ -38,45 +45,53 @@ typedef struct
 {
 	GateType type;
 	vector<int> nets;
-} Gate;
+}  Gate;
 
 typedef vector<Gate> GateList;
-
-#define fileReadERROR -1 
-#define argReadERROR -1
-#define fileReadSuccess 0
-#define SUCCESS 0
-#define FAILURE -1
-
-// declarations for variables used.
 int netCount1, netCount2,MAX_NET_ID = 0;
-
-vector<string> inputs1, outputs1, inputs2, outputs2; // input of first netlist, outputs of second netlist , ... etc 
-
+vector<string> inputs1, outputs1, inputs2, outputs2;
 vector<int > miterOutputs;
-
 map<string, int> map1, map2,map_modified2;
-
 GateList gates1, gates2,miterGateList;
-
 vector<vector<int> > cnf;
+map<int,int> assignedValues;
+vector<int> miterLiterals;
 
-//declarations of the functions used
+int  buildMiterCriterion();
+int  buildcnf(vector< vector<int> > cnf );
 
-int readFile(string filename, int & netCount, vector<string> & inputs, vector<string> & outputs, map<string, int> & map, GateList & gates);
-int readFiles(string filename1, string filename2);
+int  readFile(string filename,
+							int & netCount,
+							vector<string> & inputs,
+			  			vector<string> & outputs,
+							map<string, int> & map,
+							GateList & gates);
 
-void printData(int & netCount, vector<string> & inputs, vector<string> & outputs, map<string, int> & map, GateList & gates);
-void printDataForNetlist(int netlistNumber);
+int  readFiles(string filename1, string filename2);
+bool unitClauseOccurance(vector<vector<int> > cnf, int &Literal);
+bool pureLiteralOccurance(vector<vector<int> > cnf, int &Literal);
+bool emptyClauseCheck(vector<vector<int> > cnf);
+void cnfMapper(Gate gType);
 void printCNF(vector< vector<int> > cnf);
+void printDataForNetlist(int netlistNumber);
+void davisPutnamAlgo(vector<vector<int> > cnf,vector<int> literalList);
 
-int buildMiterCriterion();
+void printData(int & netCount,
+							 vector<string> & inputs,
+							 vector<string> & outputs,
+			   	 		 map<string, int> & map,
+							 GateList & gates);
 
-void cnfMapper(Gate gType);  
-int buildcnf(vector< vector<int> > cnf );
+void setZeroLiteral (int Literal,
+										 vector<vector<int> > cnf ,
+										 vector<vector<int> > &cnfNew,
+										 vector<int> literalList,
+										 vector<int> &literalListNew);
 
-void DP(vector< vector<int> > cnf); // Davis Putnam Algorithm
-void setZeroLiteral(int literal); 
-void setOneLiteral(int literal); 
+void setOneLiteral (int Literal,
+										vector<vector<int> > cnf ,
+										vector<vector<int> > &cnfNew,
+										vector<int> literalList,
+										vector<int> &literalListNew);
 
-#endif  //#ifndef _SAT_H_DECLARE_
+#endif  //#ifndef __SAT_H_DECLARE__

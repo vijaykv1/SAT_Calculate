@@ -1,7 +1,18 @@
-#include "sat.h" // moving all the Variables to the header files 
+/*********************************************************************
+ ** File : sat.cpp
+ ** Description: SAT Equivalence Checker using Davis Putnam Algorithm.
+ ** Author: Varun Vijaykumar <varun.vijaykumar@s2014.tu-chemnitz.de>
+ ** Date : 23rd June 2015
+ *********************************************************************/
+#include "sat.h"
+/********************* File Reading Functions ******************************/
 
-//File Reading Functions.
-int readFile(string filename, int & netCount, vector<string> & inputs, vector<string> & outputs, map<string, int> & map, GateList & gates)
+////////////////////////////////////////////////////////////////////////////
+// Reads netlist from the files that has been given as input to function.
+////////////////////////////////////////////////////////////////////////////
+int readFile(string filename, int & netCount, vector<string> & inputs,
+			 vector<string> & outputs, map<string, int> & map,
+			 GateList & gates)
 {
 	ifstream file(filename.c_str());
 	if (! file.is_open())
@@ -49,7 +60,9 @@ int readFile(string filename, int & netCount, vector<string> & inputs, vector<st
 		stringstream gateStream(curLine);
 		gateStream >> buf;
 		Gate curGate;
-		curGate.type = (buf == "and" ? AND : buf == "or" ? OR : buf == "inv" ? INV : buf == "xor" ? XOR : buf == "zero" ? ZERO : buf == "one" ? ONE : UNDEFINED);
+		curGate.type = (buf == "and" ? AND : buf == "or" ? OR : buf == "inv" ? INV :
+		 								buf == "xor" ? XOR : buf == "zero" ? ZERO : buf == "one" ?
+										ONE : UNDEFINED);
 		if (curGate.type == UNDEFINED)
 		{
 			return FAILURE;
@@ -62,8 +75,11 @@ int readFile(string filename, int & netCount, vector<string> & inputs, vector<st
 		gates.push_back(curGate);
 	}
 	return 0;
-}
+}//readFile
 
+////////////////////////////////////////////////////////////////////////////
+// Wrapper Function for the read files function.
+////////////////////////////////////////////////////////////////////////////
 int readFiles(string filename1, string filename2)
 {
 	if (readFile(filename1, netCount1, inputs1, outputs1, map1, gates1) != 0)
@@ -75,10 +91,15 @@ int readFiles(string filename1, string filename2)
 		return -1;
 	}
 	return 0;
-}
+}//readFiles
 
-//Printing Functions.
-void printData(int & netCount, vector<string> & inputs, vector<string> & outputs, map<string, int> & map, GateList & gates)
+/********************* Printing Functions ***********************************/
+
+////////////////////////////////////////////////////////////////////////////
+// Prints the data on terminal for the circuit supplied in the netlist file.
+////////////////////////////////////////////////////////////////////////////
+void printData(int & netCount, vector<string> & inputs, vector<string> & outputs,
+				map<string, int> & map , GateList & gates)
 {
 	cout << "Net count: " << netCount << "\n\n";
 	cout << "Inputs:\n";
@@ -107,7 +128,9 @@ void printData(int & netCount, vector<string> & inputs, vector<string> & outputs
 	for (size_t i=0; i<gates.size(); i++)
 	{
 		Gate & curGate = gates[i];
-		cout << (curGate.type == AND ? "AND" : curGate.type == OR ? "OR" : curGate.type == INV ? "INV" : curGate.type == XOR ? "XOR" : curGate.type == ZERO ? "ZERO" : curGate.type == ONE ? "ONE" : "ERROR");
+		cout << (curGate.type == AND ? "AND" : curGate.type == OR ? "OR"
+						: curGate.type == INV ? "INV": curGate.type == XOR ? "XOR" :
+						curGate.type == ZERO ? "ZERO" : curGate.type == ONE ? "ONE" : "ERROR");
 		cout << ": ";
 		for (size_t j=0; j<curGate.nets.size(); j++)
 		{
@@ -116,8 +139,11 @@ void printData(int & netCount, vector<string> & inputs, vector<string> & outputs
 		cout << "\n";
 	}
 	cout << "\n";
-}
+}//printData
 
+////////////////////////////////////////////////////////////////////////////
+// Wrapper Function that deals with directing the netlist that needs displaying.
+////////////////////////////////////////////////////////////////////////////
 void printDataForNetlist(int netlistNumber)
 {
 	if (netlistNumber == 1)
@@ -132,307 +158,298 @@ void printDataForNetlist(int netlistNumber)
 	{
 		cout << "Invalid netlist number " << netlistNumber << " (must be 1 or 2)\n";
 	}
-}
+}//printDataForNetlist
 
+////////////////////////////////////////////////////////////////////////////
+// Prints the CNFs that has been created by the cnf creation Algorithm or
+// the Davis Putnam Algorithm processing unit.
+////////////////////////////////////////////////////////////////////////////
 void printCNF(vector< vector<int> > cnf)
 {
+	cout << "*************************************************" << endl;
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ " << endl ;
+	cout << "CNF Size is : " << cnf.size() << endl;
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ " << endl ;
+
 	for (int i = 0 ; i < cnf.size() ; i++)
 	{
-		vector <int> clauses = cnf[i]; // dump the first clause from the list of clauses ... 
+		vector <int> clauses = cnf[i];
 
 		for(int j = 0 ; j < clauses.size() ; j++)
 		{
 			if (j != 0)
 			{
-				cout << "v" ; // append Or Operator
+				cout << " v " ;
 
 			}
 			else
 			{
-				cout << " {" ; 
+				cout << " (" ;
 			}
-			cout << "("<<clauses[j]<<")"; 
+			cout <<clauses[j];
 		}
-		cout << "} " ; // end of the clause printed here and may or may not be the start of the next clause 
+		cout << ") " << endl;
 	}
-	cout << endl; // end of the whole CNF Function 
-}
+	cout << endl;
+	cout << "*************************************************" << endl;
+}//printCNF
 
+/********************  Processing Algorithms  *****************************/
 
-//Processing Algorithms.
+////////////////////////////////////////////////////////////////////////////
+// Reads structures which have been created via read functions and then creates
+// the respective miter Circuit for them.
+////////////////////////////////////////////////////////////////////////////
 int buildMiterCriterion()
 {
-	// create a new vector list + Map for the purpose of remapping the ports and their corresponding gates <as we are going to create a new set of boolean functions>
-
-	int returnCode = FAILURE; 
-
-	cout << "Commencing Miter Circuit Building process !! " << endl; 
+	int returnCode = FAILURE;
 
 	for (int i = 0 ; i < inputs2.size() ; i++)
 	{
-		map_modified2[inputs2[i]] = map2[inputs2[i]] + netCount1 ; // creating a local map 
-		//map2[inputs2[i]] = map2[inputs2[i]] + netCount1;  // replace all the content in the second map with an offset ! 
+		map_modified2[inputs2[i]] = map2[inputs2[i]] + netCount1 ;
 	}
 
-	// now that we have re-alloc all the inputs , lets re-alloc all the outputs ..
 	for (int i=0; i < outputs2.size() ; i++)
 	{
-		map_modified2[outputs2[i]] = map2[outputs2[i]] + netCount1 ;  
+		map_modified2[outputs2[i]] = map2[outputs2[i]] + netCount1 ;
 	}
 
-	// Performed reallocs for all the ports .. Now we can start the Miter criterions! 
-	//for this we need to create a new Map for the newly created circuits 
-	// According to the Miter Procedure, we need to 
-	// 1) Join all the inputs of both the circuits
-	// 2) join all the outputs to the overall circuit to a XOR gate(s) <2 at a time >
-	// 3) Join all the XOR outputs to an OR gate ! <might give a hack here to speed up the algorithm overall>
-   
-    map <string,int > miterMap; // optional now , lets confirm
+   	for (int i=0; i < gates2.size() ; i++)
+	{
+		for (int j = 0 ; j< gates2[i].nets.size() ; j++)
+		gates2[i].nets[j] = gates2[i].nets[j]+ netCount1 ;
+	}
 
-    //optimizing by accessing the value only once ... might need this for the case of calculations below: 
-    int outputs_circuit1 = outputs1.size(); 
-    int outputs_circuit2 = outputs2.size(); 
-    int newOutputValue = netCount1+netCount2; 
+    map <string,int > miterMap;
 
-    //outputs are to be routed to the XOR gates.
-    if (outputs_circuit1 == outputs_circuit2) // FIXME .. Revise this condition check .. 
+    int outputs_circuit1 = outputs1.size();
+    int outputs_circuit2 = outputs2.size();
+    int newOutputValue = netCount1+netCount2+1;
+
+    if (outputs_circuit1 == outputs_circuit2)
     {
-    	int outdiff = 0 ; 
-    	// if the number of gates are even for both the circuits , then we have a jackpot , just create an new in out combination
-    	if ((outputs_circuit1 + outputs_circuit2) % 2)
+    	if (((outputs_circuit1 + outputs_circuit2) % 2 ) == 0)
     	{
-    		if (outputs_circuit1 == outputs_circuit2)
-    		{
-
-    			int outdiff = 0;
     			vector<int> miterIntermediateOutputs;
+
     			for (int i = 0 ; i < outputs_circuit1 ; i++ )
     			{
     				Gate miterGate;
     				miterGate.type = XOR;
-    				miterGate.nets[0] = map1[outputs1[i]];
-    				miterGate.nets[1] = map_modified2[outputs2[i]]; 
-    				miterGate.nets[2] = newOutputValue;
-    				miterGateList.push_back(miterGate); // each iteration pushes a new gate assignment  
-    				miterIntermediateOutputs.push_back(newOutputValue); // making a list of outputs for the intermediate values here ... <local use only>
-    				newOutputValue++;  
+    				miterGate.nets.push_back(map1[outputs1[i]]) ;
+    				miterGate.nets.push_back(map_modified2[outputs2[i]]) ;
+    				miterGate.nets.push_back(newOutputValue) ;
+    				miterGateList.push_back(miterGate);
+    				miterIntermediateOutputs.push_back(newOutputValue);
+    				newOutputValue++;
     			}
-    			// finished creating the XOR set ... Now lets take the next level of the output here
+
     			int finalMiterOutput = netCount1+netCount2+miterIntermediateOutputs.size();
 
-    			//appending the list of 
-    			if (miterIntermediateOutputs.size() != 1) 
+    			if (miterIntermediateOutputs.size() > 1)
     			{
-    				Gate miterGate; 
-    				miterGate.type = OR; 
+    				Gate miterGate;
+    				miterGate.type = OR;
+
     				for (int i = 0 ; i < miterIntermediateOutputs.size() ; i++)
     				{
-    					miterGate.nets[i] = miterIntermediateOutputs[i]; 
+    					miterGate.nets.push_back(miterIntermediateOutputs[i]);
     				}
-    				miterGate.nets[(miterIntermediateOutputs.size() + 1)] = finalMiterOutput; 
-    				miterGateList.push_back(miterGate); // add the final OR gate into the picture here !
-    				miterOutputs.push_back(finalMiterOutput);
-    				cout << "miter built successfully ! " << endl; 
+
+    				miterGate.nets.push_back(finalMiterOutput+1);
+    				miterGateList.push_back(miterGate);
+
+    				miterOutputs.push_back(finalMiterOutput+1);
+    				cout << "miter built successfully ! " << endl;
     				returnCode = SUCCESS;
     			}
-    			else 
+    			else
     			{
-    				miterOutputs.push_back(miterIntermediateOutputs[0]); // push the only value into the miterOutput ! 
+    				miterOutputs.push_back(miterIntermediateOutputs[0]);
     				cout << "Miter built successfully !!" << endl;
     				returnCode = SUCCESS;
     			}
-    		}
     	}
     }
     else
     {
-    	cout << "Miter Building Failed ... Something went really wrong !! " << endl; 
+    	cout << "Miter Building Failed,Something went really wrong !!" << endl;
     	returnCode = FAILURE;
     }
 
-    return returnCode;
-}
+    for (int i = 1 ; i <= miterOutputs[0]  ; i++)
+	{
+		miterLiterals.push_back(i);
+        assignedValues.insert(std::pair<int,int>(i,-1));
+	}
 
+    for (int i = 0 ; i < assignedValues.size(); i++)
+    {
+        cout << i+1 << ":" << assignedValues[i+1] << endl ;
+    }
+
+    for (int i = 0 ; i < miterLiterals.size(); i++)
+    {
+        cout << miterLiterals[i] << " ";
+    }
+    cout << endl;
+
+    return returnCode;
+}//buildMiterCriterion
+
+////////////////////////////////////////////////////////////////////////////
+// Builds the CNF based on the Miter circuits that has been generated.
+////////////////////////////////////////////////////////////////////////////
 int buildcnf(vector<vector<int> > cnf)
 {
-	//We are going to build the cnf for the given netlist ... and feedback the said cnf to the requester
-	if(buildMiterCriterion())
+	int returnCode = FAILURE;
+
+	if(buildMiterCriterion() == SUCCESS)
 	{
-		cout << "Miter Criterion built .. creating the CNF based on cicuits.." << endl;
-
-		/*now we have to create a cnf dump based on the gates for 3 circuits : 
-		*1)gates1
-		*2)gates2
-		*3)miterGateList
-		*4)input assignments */
-
-		cout << "creating cnf out of miter circuit created !!" << endl;
-
-		//inputs Assignment Case ... We will create a temporary Gate called EQUAL and Feed it to the CNFMapper 
 		Gate InputGate;
 		InputGate.type = EQUAL;
-		cnfMapper(InputGate); // Test code 
+		cnfMapper(InputGate);
 
 		for (int i = 0 ; i < gates1.size(); i++)
 		{
 			cnfMapper(gates1[i]);
 		}
 
-		// starting with the dump of gates2 
 		for (int i = 0 ; i < gates2.size(); i++)
 		{
 			cnfMapper(gates2[i]);
 		}
 
-		//starting with the dump of miterGateList 
 		for (int i = 0 ; i < miterGateList.size(); i++ )
 		{
 			cnfMapper(miterGateList[i]);
 		}
 
-		return SUCCESS; 
+		returnCode = SUCCESS;
 	}
 	else
 	{
-		cout << "Miter Criterion building Failed ... returning Failure ! " << endl; 
-		return FAILURE; 
+		cout << "Miter Criterion building Failed ... returning Failure ! " << endl;
 	}
-	 // stub for the time being
-}
 
+	return returnCode;
+}//buildcnf
+
+////////////////////////////////////////////////////////////////////////////
+// CNF mapping according to the gates that are present in the miter circuit.
+////////////////////////////////////////////////////////////////////////////
 void cnfMapper(Gate gType)
 {
-	// CNF Mapper function
 	switch (gType.type){
 		case OR:
-			cout << "OR Gate detected...Characterestic Dumped into CNF " << endl;
 			if (gType.nets.size() > 3)
 			{
 				vector<int > cnfClause;
 				for (int i =0; i < (gType.nets.size()-1) ; i++){
-					cnfClause.push_back(gType.nets[i]); // we are giving -1 because we are not including the output port into the equations
+					cnfClause.push_back(gType.nets[i]);
 				}
 				cnf.push_back(cnfClause);
 			}
 			else
 			{
 				vector<int > cnfClause1,cnfClause2,cnfClause3;
-				//clause1
+
 				cnfClause1.push_back(-(gType.nets[0]));
-				cnfClause1.push_back(-(gType.nets[2]));
-				//clause 2
+				cnfClause1.push_back((gType.nets[2]));
 				cnfClause2.push_back(-(gType.nets[1]));
 				cnfClause2.push_back(gType.nets[2]);
-				//clause 3 
 				cnfClause3.push_back(gType.nets[0]);
 				cnfClause3.push_back(gType.nets[1]);
 				cnfClause3.push_back(-(gType.nets[2]));
-				//Pushing in
+
 				cnf.push_back(cnfClause1);
 				cnf.push_back(cnfClause2);
 				cnf.push_back(cnfClause3);
-			} 
+
+			}
 			break;
-				
+
 		case AND:
 		{
 			vector<int > cnfClause1,cnfClause2,cnfClause3;
-			//clause1
+
 			cnfClause1.push_back(gType.nets[0]);
 			cnfClause1.push_back(-(gType.nets[2]));
-			//clause 2
 			cnfClause2.push_back(gType.nets[1]);
 			cnfClause2.push_back(-(gType.nets[2]));
-			//clause 3 
 			cnfClause3.push_back(-(gType.nets[0]));
 			cnfClause3.push_back(-(gType.nets[1]));
 			cnfClause3.push_back(gType.nets[2]);
-			//Pushing in
+
 			cnf.push_back(cnfClause1);
 			cnf.push_back(cnfClause2);
 			cnf.push_back(cnfClause3);
-			cout << "AND Gate detected ... Characterestic Dumped into CNF" << endl ;
+
 			break;
 		}
 
 		case INV:
 		{
 			vector<int > cnfClause1,cnfClause2,cnfClause3;
-			//Clause 1
+
 			cnfClause1.push_back(gType.nets[0]);
 			cnfClause1.push_back(gType.nets[1]);
-
-			//Clause 2 
 			cnfClause2.push_back(-(gType.nets[0]));
 			cnfClause2.push_back(-(gType.nets[1]));
 
-			//Pushing in 
-			cnf.push_back(cnfClause1);
+      cnf.push_back(cnfClause1);
 			cnf.push_back(cnfClause2);
-			cout << "INV Gate detected ... Characterestic Dumped into CNF" << endl ;
+
 			break;
 		}
 
 		case XOR:
 		{
 			vector<int > cnfClause1,cnfClause2,cnfClause3,cnfClause4;
-			//clause 1
+
 			cnfClause1.push_back(gType.nets[0]);
 			cnfClause1.push_back(gType.nets[1]);
 			cnfClause1.push_back(-(gType.nets[2]));
-			//clause 2
 			cnfClause2.push_back(-(gType.nets[0]));
 			cnfClause2.push_back(-(gType.nets[1]));
 			cnfClause2.push_back(-(gType.nets[2]));
-			//clause3
 			cnfClause3.push_back(-(gType.nets[0]));
 			cnfClause3.push_back(gType.nets[1]);
 			cnfClause3.push_back(gType.nets[2]);
-			//clause 4
 			cnfClause4.push_back(gType.nets[0]);
 			cnfClause4.push_back(-(gType.nets[1]));
 			cnfClause4.push_back(gType.nets[2]);
-			//pushing in 
+
 			cnf.push_back(cnfClause1);
 			cnf.push_back(cnfClause2);
 			cnf.push_back(cnfClause3);
 			cnf.push_back(cnfClause4);
-			cout << "XOR Gate detected... Characterestic Dumped into CNF" << endl; 
+
 			break;
 		}
 
-		case ZERO: //prefer this to be dead code 
-			cout << "ZERO gate detected ... nothing to do , as of now stubbed ... " << endl; 
+		case ZERO: //dead code
 			break;
 
-		case ONE: //prefer this to be dead code 
-			cout << "ONE gate detected ... nothing to do , as of now stubbed ... " << endl;
+		case ONE: //dead code
 			break;
 
-		case EQUAL: //to deal with the inputs Mapping in the Miter circuit 
-			cout << "EQUAL GATE detected ... Feeding the case of inputs Mapping into the CNF ..." << endl;
-
+		case EQUAL:
 			if (inputs1.size() == inputs2.size())
 			{
 				for (int i = 0 ; i < inputs1.size() ; i++)
 				{
-					// equality feeder 
 					vector<int> clause1,clause2;
 
 					for (int j = 0 ; j < inputs1.size() ; j++)
 					{
 						if (inputs1[i] == inputs2[j])
 						{
-							// logic here : IFF the inputs are of the same type, then create the CNF based on that !
-							//clause 1
 							clause1.push_back(-(map1[inputs1[i]]));
 							clause1.push_back(map_modified2[inputs2[j]]);
-						
-							//clause 2
 							clause2.push_back(map1[inputs1[i]]);
-							clause2.push_back(-(map_modified2[inputs2[j]])); 
-							
-							//pushing in cnf
+							clause2.push_back(-(map_modified2[inputs2[j]]));
+
 							cnf.push_back(clause1);
 							cnf.push_back(clause2);
 						}
@@ -441,159 +458,383 @@ void cnfMapper(Gate gType)
 			}
 			break;
 
-		case UNDEFINED:	//rare case .. Mostly Happens when we have an UNDEFINED Gate 
-		default: 
-			cout << "NO GATE detected ... NO CNF DUMPING" << endl; 
+		case UNDEFINED:
+		default:
+			cout << "NO GATE detected ... NO CNF DUMPING" << endl;
 			break;
 	}
-}
+}//cnfMapper
 
-//Needs a serious Revision of this code as some of the parts are still not conformed ! 
-void DP(vector< vector<int> > cnf)
+////////////////////////////////////////////////////////////////////////////
+// Main Davis Putnam Engine Function. (Recursive Functionality Enabled here)
+////////////////////////////////////////////////////////////////////////////
+void davisPutnamAlgo(vector<vector<int> > cnf, std::vector<int> literalsList)
 {
-	// OK ... now we have got the generated from the above said Algorithms ... 
-	bool emptyClause = false ; // Reconsider removong this once the whole algorithm is cleared 
-	/*
-	* Davis Putnam Algorithm Mechanism 
-	*1) Clear off all the pure Literals
-	*2) Apply the unit Clause rule.
-	*3) Check if the CNF is empty ... Then stop the Algorithm and make the decision !
-	*4) If Clause is Empty then Backtrack --> Not quite clear.
-	*5) run the setting the variables to 0 or 1 and run the algorithm recursively. 
-	*/ 
-	
-	// Checking Unit Clause rule
-	for (int i = 0 ; i < cnf.size() ; i++)
-	{
-		vector<int> clause = cnf[i]; 
-		
-		if (clause.size() == 1 )
-		{
-			int literal = clause[0]; 
+    int literal_extracted ;
+    vector<vector<int> > cnfNew;
+    vector <int > literalmaint;
 
-			if (literal >= 0) // positive 
-			{
-				setOneLiteral(literal);
-			}
-			else //negetive 
-			{
-				setZeroLiteral(literal);
-			}  
-		}
-		else if (clause.size() == 0 )
+    printCNF(cnf);
+
+    while (unitClauseOccurance(cnf, literal_extracted) ||
+					 pureLiteralOccurance(cnf, literal_extracted))
+    {
+        if (unitClauseOccurance(cnf, literal_extracted))
+        {
+        	cout << "-- Unit Clause Reduction --" << endl ;
+            if (literal_extracted > 0 )
+            {
+                setOneLiteral(literal_extracted, cnf,
+															cnfNew,literalsList,literalmaint);
+            }
+            else
+            {
+                setZeroLiteral(literal_extracted, cnf,
+															cnfNew,literalsList,literalmaint);
+            }
+            cnf = cnfNew;
+            literalsList = literalmaint;
+            cout << "-- End of Unit Clause Reduction -- "<< endl << endl ;
+        }
+        else if (pureLiteralOccurance(cnf, literal_extracted))
+        {
+        	cout << "-- Pure Literal Reduction -- " << endl ;
+            if (literal_extracted > 0 )
+            {
+                setOneLiteral(literal_extracted,cnf,
+															cnfNew,literalsList,literalmaint);
+            }
+            else // negetive value
+            {
+                setZeroLiteral(literal_extracted, cnf,
+															 cnfNew,literalsList,literalmaint);
+            }
+            cnf = cnfNew;
+            literalsList = literalmaint;
+            cout << "-- End of Pure Literal Reduction -- " << endl << endl;
+        }
+        else
+        {
+            cout  << " should not be entering here ... check code !! " << endl;
+        }
+    }
+
+    if (cnf.size() == 0 )
+    {
+        cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++ " << endl;
+        cout << "************** CIRCUIT IS NOT EQUIVALENT !! ******** " << endl;
+        cout << "************** Counter Solution Proposed *********** " << endl;
+
+        cout << "INPUTS (To both Circuits via Miter Input Feeding) : " << endl ;
+        for (int i = 0 ; i < inputs1.size() ; i++)
+        {
+        	cout << inputs1[i] << ":" << assignedValues[map1[inputs1[i]]] << endl;
+        }
+
+        cout << "OUTPUTS (Circuit 1): " << endl ;
+        for (int k = 0 ; k < outputs1.size(); k++)
+        {
+        	cout << outputs1[k] << ":" << assignedValues[map1[outputs1[k]]];
+        }
+
+        cout << endl << "OUTPUTS (Circuit 2): " << endl ;
+        for (int j = 0 ; j < outputs2.size(); j++)
+        {
+        	cout << outputs2[j] << ":" << assignedValues[map_modified2[outputs2[j]]];
+        }
+
+        cout << endl << "++++++++++++++++++++++++++++++++++++++++++++ " << endl;
+        exit(0);
+    }
+    else if (emptyClauseCheck(cnf))
+    {
+        return;
+    }
+    else
+    {
+        if (literalsList.size() != 0 )
+        {
+            int literal_selected = literalsList.back() ;
+
+            literalsList.pop_back();
+
+            vector<vector<int> > cnf0,cnf1;
+            vector<int> literalBackTrack1,literalBackTrack2;
+
+            if (literal_selected != miterOutputs[0])
+            {
+				setZeroLiteral(literal_selected ,cnf, cnf0,literalsList,literalBackTrack1);
+            	davisPutnamAlgo(cnf0,literalBackTrack1);
+            }
+
+            setOneLiteral(literal_selected, cnf, cnf1,literalsList,literalBackTrack2);
+            davisPutnamAlgo(cnf1,literalBackTrack2);
+
+            assignedValues[literal_selected] = -1;
+           	literalsList.push_back(literal_selected);
+            return;
+        }
+    }
+}//davisPutnamAlgo
+
+////////////////////////////////////////////////////////////////////////////
+// Helper Function for Davis Putnam Engine.
+// This will scan the CNF created for a unitClause (eg : (1), (4) , etc ...)
+////////////////////////////////////////////////////////////////////////////
+bool unitClauseOccurance(vector<vector<int> > cnf,int &literal)
+{
+	bool returnCode = false;
+
+	for(int i = 0 ; i < cnf.size(); i++)
+	{
+		vector<int> clause = cnf[i];
+
+		if ((clause.size() == 1) && (clause[0] != 0 ))
 		{
-			emptyClause = true ; //wrong --> Needs FIXING 
+			literal = clause[0];
+            returnCode = true;
+		}
+		else
+		{
+			literal = 0 ;
+			returnCode = false;
 		}
 	}
+	return returnCode;
+} //unitClauseOccurance
 
-	// Checking for the pureLiteral rule
-	for (int check_variable = 0 ; check_variable < miterOutputs[0] ; check_variable++)
+////////////////////////////////////////////////////////////////////////////
+// Helper Function for the Davis Putnam Algorithm.
+// This will scan the CNF for a commonly occuring Literal throughout.
+////////////////////////////////////////////////////////////////////////////
+bool pureLiteralOccurance(vector<vector<int> > cnf, int &literal)
+{
+	bool returnCode = false;
+	int size_CNF = cnf.size();
+
+	if (cnf.size() != 0 )
 	{
-		int check_variable_positive_counter = 0 ; 
-		int check_variable_negetive_counter = 0 ;
-		for (int i = 0 ; i < cnf.size() ; i++)
+		for (int checkElement = 1 ; checkElement <= miterOutputs[0] ; checkElement++ )
 		{
-			vector<int > clause = cnf[i];
+			int positiveElement = 0;
+			int negetiveElement = 0;
 
-			for (int j = 0 ; j < clause.size() ; j++)
+			for (int i = 0 ; i < cnf.size() ; i++)
 			{
-				if (clause[j] == check_variable)
+				if (find(cnf[i].begin(),cnf[i].end(),checkElement) != cnf[i].end())
 				{
-					check_variable_positive_counter++; // increment count by 1 
+					positiveElement++;
 				}
-				else if (clause[j] == (-check_variable))
+				else if (find(cnf[i].begin(),cnf[i].end(),(-checkElement))!= cnf[i].end())
 				{
-					check_variable_negetive_counter++; // increment count by 1  
+					negetiveElement++;
+				}
+				else
+				{
+					vector<int> clause = cnf[i];
+					int lastElement = clause.size();
+
+                    if (clause.size() != 0 )
+                    {
+                        // checking the end element as well
+                        if (clause[lastElement-1] == checkElement)
+                        {
+                            positiveElement++;
+                        }
+                        else if (clause[lastElement] == (-checkElement))
+                        {
+                            negetiveElement++;
+                        }
+                    }
 				}
 			}
+
+			if (((negetiveElement == size_CNF) && (positiveElement == 0 ) ) ||
+                ((positiveElement == size_CNF) && (negetiveElement == 0 )))
+			{
+				literal = checkElement;
+				returnCode = true;
+				break;
+			}
+			else
+			{
+				literal = 0 ;
+			}
 		}
-
-		if ((check_variable_negetive_counter > 0) && (check_variable_positive_counter == 0) )
-		{
-			setZeroLiteral(check_variable);
-		}
-		else if ((check_variable_positive_counter > 0) && (check_variable_negetive_counter == 0) )
-		{
-			setOneLiteral(check_variable);
-		}
 	}
 
-	// Commence CNF checks here
-	if (cnf.size() == 0 )
-	{
-		cout << "***************** FINAL RESULT ************************** " << endl ; 
-		cout << "THE GIVE CIRCUITS ARE EQUIVALENT !! TERMINATING ALGORITHM !!! " << endl ; 
-		cout << "********************************************************* " << endl ; 		
-	}
-	else if (emptyClause)// empty clause --> WRONG .. Needs FIXING FIXME 
-	{
-		// FIXME understand from Mathias Sauppe 
+	return returnCode;
+} //pureLiteralOccurance
 
-		cout << "***************** FINAL RESULT ************************** " << endl ; 
-		cout << "THE GIVE CIRCUITS ARE NOT EQUIVALENT !! " << endl ; 
-		cout << "********************************************************* " << endl ; 
-		return ; // We Stop the algorithm here no use to contnue ... 
-	}
-	else
-	{
-		int cnf_rightmost_index = (cnf.size()-1); // randomising using the rightmost literal and setting the values on it ...
-		vector<int> clause = cnf[cnf_rightmost_index];
-		int backtrackLiteral = clause[(clause.size() - 1)];
-
-		setZeroLiteral(backtrackLiteral); // should be creating a new cnf Automatically 
-		DP(cnf);
-		setOneLiteral(backtrackLiteral); 
-		DP(cnf);  
-		// Backtracking Logic 
-	}
-}
-
-void setZeroLiteral (int Literal)
+////////////////////////////////////////////////////////////////////////////
+// Helper Function For Davis Putnam Engine.
+// This will help in scanning the CNF for occurance of (0)
+////////////////////////////////////////////////////////////////////////////
+bool emptyClauseCheck(vector<vector<int> > cnf)
 {
+	bool returnCode = false;
+
 	for (int i = 0 ; i < cnf.size() ; i++)
 	{
-		vector <int > clause = cnf[i];
-		for (int j = 0 ; j < clause.size() ; j++)
+		vector<int> clause = cnf[i];
+		if ((clause.size() == 1) && (clause[0] == 0 ))
 		{
-			if(clause[j] == Literal)
-			{
-				//Literal to be removed 
-				clause.erase(clause.begin()+j); //equivalent to putting 0 in place of a literal.
-
-			}
-			else if (clause[j] == (-Literal))
-			{
-				//clause to be removed !
-				cnf.erase(cnf.begin()+i); //equivalent to puttng 1 in place of the literal.
-				break; //goes to the next clause 
-			}
+			returnCode = true ;
+            break ;
 		}
 	}
-}
+	return returnCode;
+} //emptyClauseCheck
 
-void setOneLiteral (int Literal)
+/***************************** HEART FUNCTIONS *****************************/
+
+////////////////////////////////////////////////////////////////////////////
+// Helper Function to Davis Putnam Function.
+// Helps in setting a Literal to 1.
+// Special Condition: if the Literal has a negetive sign then a 0 is set.
+////////////////////////////////////////////////////////////////////////////
+void setOneLiteral(int Literal,vector<vector<int> > cnf,
+				   std::vector<std::vector<int> > &cnfNew,vector<int> literalList,
+				   vector<int> &literalListNew)
 {
-	for (int i = 0 ; i < cnf.size() ; i++)
+	literalListNew = literalList;
+
+    if ((literalListNew.size() != 0) &&
+			 ((find(literalListNew.begin(), literalListNew.end(), Literal) != literalListNew.end())
+       || (literalListNew[literalList.size()] == Literal)))
+    {
+        literalListNew.erase(remove(literalListNew.begin(),
+																		literalListNew.end(),
+																		Literal),
+															literalListNew.end());
+    }
+
+    if (Literal < 0 )
+    {
+    	Literal = -Literal;
+    }
+
+    if (assignedValues.find(Literal) == assignedValues.end())
+    {
+        assignedValues.insert(std::pair<int,int>(Literal,1));
+    }
+    else
+    {
+        assignedValues[Literal] = 1;
+
+        for (int i = 0 ; i < assignedValues.size(); i++)
+        {
+        	if ((i+1) == Literal)
+        	{
+        		cout << i+1 << ":" << assignedValues[i+1] << " <--- Changed here "<<endl ;
+        	}
+        	else
+        	{
+        		cout << i+1 << ":" << assignedValues[i+1] << endl ;
+        	}
+        }
+    }
+
+    cnfNew = cnf;
+	for (int i = (cnfNew.size()-1); i >= 0 ; i--)
 	{
-		vector <int > clause = cnf[i];
-		for (int j = 0 ; j < clause.size() ; j++)
+		for (int j = (cnfNew[i].size()-1); j >= 0 ; j--)
 		{
-			if(clause[j] == Literal)
+			if (cnfNew[i][j] == Literal)
 			{
-				//clause to be removed 
-				cnf.erase(cnf.begin()+i); // equivalent to putting 1 in place of a literal.
-				break; // goes to the next clause ...
+				cnfNew.erase(cnfNew.begin()+i);
 			}
-			else if (clause[j] == (-Literal))
+			else if ((cnfNew[i][j] == (-Literal)) && (cnfNew[i].size() > 1))
 			{
-				//Literal to be removed !
-				clause.erase(clause.begin()+j); // equivalent to putting 0 in place of the literal  
+				cnfNew[i].erase(cnfNew[i].begin()+j);
+			}
+			else if (cnfNew[i][j] == (-Literal))
+			{
+				cnfNew[i][j] = 0;
 			}
 		}
 	}
+}//setOneLiteral
 
-}
+////////////////////////////////////////////////////////////////////////////
+// Helper Function to Davis Putnam Function.
+// Helps in setting a Literal to 0.
+// Special Condition: if the Literal has a negetive sign then a 1 is set.
+////////////////////////////////////////////////////////////////////////////
+void setZeroLiteral(int Literal, vector<vector<int> > cnf,
+					vector<vector<int> > &cnfNew,vector<int> literalList,
+					vector<int> &literalListNew)
+{
+	literalListNew = literalList;
+    if ((literalListNew.size() != 0) &&
+		((find(literalListNew.begin(), literalListNew.end(), Literal) != literalListNew.end())
+    || (literalListNew[literalListNew.size()] == Literal)))
+    {
+        literalListNew.erase(remove(literalListNew.begin(),
+																		literalListNew.end(),
+																		Literal),
+														literalListNew.end());
+    }
 
+    if (Literal < 0 )
+    {
+    	Literal = -Literal;
+    }
+
+    if (assignedValues.find(Literal) == assignedValues.end())
+    {
+        assignedValues.insert(std::pair<int,int>(Literal,0));
+    }
+    else
+    {
+        assignedValues[Literal] = 0;
+
+        for (int i = 1 ; i < assignedValues.size(); i++)
+        {
+        	if ((i+1) == Literal)
+        	{
+        		cout << i+1 << ":" << assignedValues[i+1] << "  <----- Changed here "<<endl ;
+        	}
+        	else
+        	{
+        		cout << i+1 << ":" << assignedValues[i+1] << endl ;
+        	}
+        }
+
+    }
+
+    cnfNew = cnf;
+	for (int i = (cnfNew.size()-1); i >= 0 ; i--)
+	{
+		for (int j = (cnfNew[i].size()-1); j >= 0 ; j--)
+		{
+			if (cnfNew[i][j] == (-Literal))
+			{
+				cnfNew.erase(cnfNew.begin()+i);
+			}
+			else if ((cnfNew[i][j] == Literal) && (cnfNew[i].size() > 1))
+			{
+				cnfNew[i].erase(cnfNew[i].begin()+j);
+			}
+			else if (cnfNew[i][j] == Literal)
+			{
+				cnfNew[i][j] = 0;
+			}
+		}
+	}
+}//setZeroLiteral
+
+
+/************************** MAIN FUNCTION **********************************/
+
+////////////////////////////////////////////////////////////////////////////
+// Main Control Function.
+// Performs Calls for
+// 1) Circuitry Reading from the .net file
+// 2) Miter Circuitry Creation.
+// 3) Davis Putnam Engine Activation
+// 4) Display of result (if necessary , i.e. depends on the end point)
+////////////////////////////////////////////////////////////////////////////
 int main(int argc, char ** argv)
 {
 	if (argc != 3)
@@ -601,66 +842,34 @@ int main(int argc, char ** argv)
 		cerr << "Wrong argument count!\n";
 		return argReadERROR;
 	}
-	//How this works ? Simple! Just feed the files via the application pipe... <probably with the file systems>
+
 	if (readFiles(argv[1], argv[2]) != 0)
 	{
 		cerr << "Error while reading files!\n";
 		return fileReadERROR;
 	}
 
-	// The following global variables are now defined (examples are for file xor2.net):
-	//
-	// int netCount1, netCount2
-	// - total number of nets in netlist 1 / 2
-	// - e.g. netCount1 is 3
-	//
-	// vector<string> inputs1, outputs1, inputs2, outputs2
-	// - names of inputs / outputs in netlist 1 / 2
-	// - e.g. inputs1[0] contains "a"
-	//
-	// map<string, int> map1, map2
-	// - mapping from input / output names to net numbers in netlist 1 / 2
-	// - e.g. map1["a"] is 1, map1["b"] is 2, ...
-	//
-	// GateList gates1, gates2
-	// - list (std::vector<Gate>) of all gates in netlist 1 / 2
-	// - e.g.:
-	//   - gates1[0].type is XOR
-	//   - gates1[0].nets is std::vector<int> and contains three ints (one for each XOR port)
-	//   - gates1[0].nets[0] is 1 (first XOR input port)
-	//   - gates1[0].nets[1] is 2 (second XOR input port)
-	//   - gates1[0].nets[2] is 3 (XOR output port)
-	
-	// Print out data structure - (for debugging)
 	cout << "Netlist 1:\n==========\n";
 	printDataForNetlist(1);
 	cout << "\nNetlist 2:\n==========\n";
 	printDataForNetlist(2);
 
-	
-	//
-	// Add your to build the CNF.
-	// The CNF should be a vector of vectors of ints. Each "inner" vector represents one clause. The "outer" vector represents the whole CNF.
-	//
-	int cnf_build = buildcnf(cnf); // netlists are global to the function mentioned 
-	
-	//
-	// Check CNF for satisfiability using the Davis Putnam algorithm
-	//
-	if (cnf_build != 0)
+	if (buildcnf(cnf) != 0)
 	{
-		cout << "CNF building Failed ... Marking whole SAT Algorithm as failure "; 
+		cout << "CNF building Failed ... Marking whole SAT Algorithm as failure ";
 		return FAILURE;
 	}
-	else 
+	else
 	{
+		cout << "###################################################" << endl;
+		cout << "CNF : " ;
+		printCNF(cnf);
+    cout << "#######################################################" << endl ;
 		cout << "CNF build successful ... Now applying Davis Putnam Algorithm" << endl ;
-		cout << "#############################################################" << endl; 
-		cout << "CNF used is " << endl ;
-		printCNF(cnf);  // TODO printing the table that we have created for the case of Circuit // Code Regen till here success --> dated 14/05/2015
-        cout << "#############################################################" << endl ;
-		// DP(cnf);
+		davisPutnamAlgo(cnf,miterLiterals);
+		cout << "***************** FINAL RESULT ************************** " << endl ;
+		cout << "THE GIVEN CIRCUITS ARE EQUIVALENT !! " << endl ;
+		cout << "********************************************************* " << endl ;
 	}
-	
 	return SUCCESS;
-}
+}//main
