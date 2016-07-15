@@ -196,49 +196,6 @@ bool CNF::createCNF(netListDetails netList1, netListDetails netList2)
     gateMapper(netList1.Gates, true);
     gateMapper(netList2.Gates, false);
 
-    std::map<std::string, int>::iterator it1, it2;
-    int stop1, stop2;
-    stop1 = 0;
-
-    for ( it1= netList1.map.begin(); it1!= netList1.map.end() ; ++it1 )
-    {
-        stop2 = 0;
-
-        for ( it2= netList2.map.begin(); it2!= netList2.map.end() ; ++it2 )
-        {
-            if (it1->first == it2->first)
-            {
-                int a=-it1->second;
-                int b=it2->second + m_netCount1;
-                std::vector<int> clause1;
-                std::vector<int> clause2;
-
-                clause1.push_back(-a);
-                clause1.push_back(-b);
-                cnf.push_back(clause1);
-
-                clause2.push_back(a);
-                clause2.push_back(b);
-                cnf.push_back(clause2);
-            }
-
-            stop2 += 1;
-
-            if ( stop2 == netList1.inputs.size() )
-            {
-                break;
-            }
-        }
-
-        stop1+=1;
-
-        if ( stop1 == netList1.inputs.size() )
-        {
-            std::cout<< std::endl ;
-            break;
-        }
-    }
-
     // Dump the output to the Miter Circuitry
     std::vector<int> out;
     int a,b,c = 0;
@@ -280,7 +237,7 @@ bool CNF::createCNF(netListDetails netList1, netListDetails netList2)
             }
         }
     }
-    m_miterFinalNetCount = c; 
+    m_miterFinalNetCount = c;
     cnf.push_back(out);
 
     return true; // All success
