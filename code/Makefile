@@ -1,18 +1,21 @@
-# Makefile for the project related to SAT equivalence Check algorithms.
-# AUTHOR : VARUN VIJAYKUMAR
+###########################################################
+## Makefile for SAT Calculation project
+## Authors: Varun Vijaykumar
+## Date : 12 - June - 2016
+###########################################################
 
-CC := g++
-CFLAGS = -C -Wall
-LDFLAGS =
-SOURCES = sat.cpp
-OBJECTS = $(SOURCES :.cpp=.o)
-EXECUTABLE = SAT_Calculate
+CC = g++
 
-all: $(SOURCES) $(EXECUTABLE)
+HEADERS = DavisPutnam.h fileParser.h CNF.h dataManagement.h
 
-$(EXECUTABLE): $(SOURCES)
-	$(CC) $(LDFLAGS) $(SOURCES)  -o $(EXECUTABLE) 
-	echo "code built ! binary generated is " $(EXECUTABLE)
+SOURCES = DavisPutnam.cpp main.cpp fileParser.cpp CNF.cpp
+
+CFLAGS = -std=c++11 -o
+
+bin = sat
+
+$(bin) : $(SOURCES)
+	$(CC) $^ $(CFLAGS) $@
 
 clean:
-	rm -vrf $(EXECUTABLE)
+	rm -vrf $(bin)
